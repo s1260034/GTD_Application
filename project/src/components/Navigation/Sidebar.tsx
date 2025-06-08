@@ -1,12 +1,12 @@
 import React from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
-import { Inbox, ArrowRight, User, Calendar, Layers, Clock, Archive, CheckCircle, Trash2, Target } from 'lucide-react';
+import { Inbox, ArrowRight, User, Calendar, Layers, Clock, Archive, CheckCircle, Trash2, Target, Search } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Link, useLocation } from 'react-router-dom';
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { tasks } = useTaskContext();
+  const { tasks, projects } = useTaskContext();
   
   const { t } = useLanguage();
   const counts = {
@@ -14,7 +14,7 @@ const Sidebar: React.FC = () => {
     next: tasks.filter(t => t.status === 'next').length,
     waiting: tasks.filter(t => t.status === 'waiting').length,
     scheduled: tasks.filter(t => t.status === 'scheduled').length,
-    project: tasks.filter(t => t.status === 'project').length,
+    project: projects.length, // プロジェクトの実際の数を使用
     someday: tasks.filter(t => t.status === 'someday').length,
     reference: tasks.filter(t => t.status === 'reference').length,
     completed: tasks.filter(t => t.status === 'completed').length,
@@ -29,6 +29,17 @@ const Sidebar: React.FC = () => {
       color: 'text-gray-600',
       activeColor: 'bg-gray-100 text-gray-800',
       count: counts.inbox,
+    },
+    {
+      to: '/search',
+      label: 'タスク検索',
+      icon: <Search className="w-5 h-5" />,
+      color: 'text-blue-600',
+      activeColor: 'bg-blue-100 text-blue-800',
+      count: 0,
+    },
+    {
+      type: 'divider'
     },
     {
       to: '/next',
@@ -100,7 +111,7 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 h-full flex-shrink-0 hidden md:block">
+    <aside className="w-64 bg-white border-r border-gray-200 h-full flex-shrink-0 hidden md:flex md:flex-col">
       <div className="p-6 border-b border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50">
         <div className="flex items-center mb-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
@@ -135,7 +146,7 @@ const Sidebar: React.FC = () => {
         </div>
       </div>
       
-      <nav className="py-4">
+      <nav className="py-4 flex-1">
         <ul>
           {navItems.map((item, index) => {
             if (item.type === 'divider') {

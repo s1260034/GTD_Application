@@ -5,7 +5,11 @@ import TaskItem from '../common/TaskItem';
 import InboxInput from './InboxInput';
 import { Clock, Info } from 'lucide-react';
 
-const InboxList: React.FC = () => {
+interface InboxListProps {
+  onUpgrade: () => void;
+}
+
+const InboxList: React.FC<InboxListProps> = ({ onUpgrade }) => {
   const { getTasksByStatus } = useTaskContext();
   const { startProcessing } = useProcessContext();
   
@@ -21,7 +25,7 @@ const InboxList: React.FC = () => {
         </p>
       </div>
       
-      <InboxInput />
+      <InboxInput onUpgrade={onUpgrade} />
       
       {inboxTasks.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-gray-50 rounded-lg">

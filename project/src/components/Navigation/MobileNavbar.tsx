@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
-import { Inbox, ArrowRight, User, Calendar, Layers, Clock, Menu, X, Archive, CheckCircle, Trash2, Target } from 'lucide-react';
+import { Inbox, ArrowRight, User, Calendar, Layers, Clock, Menu, X, Archive, CheckCircle, Trash2, Target, Search } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Link, useLocation } from 'react-router-dom';
+import UserMenu from './UserMenu';
 
 const MobileNavbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const { tasks } = useTaskContext();
+  const { tasks, projects } = useTaskContext();
   
   const { t } = useLanguage();
   const counts = {
@@ -15,7 +16,7 @@ const MobileNavbar: React.FC = () => {
     next: tasks.filter(t => t.status === 'next').length,
     waiting: tasks.filter(t => t.status === 'waiting').length,
     scheduled: tasks.filter(t => t.status === 'scheduled').length,
-    project: tasks.filter(t => t.status === 'project').length,
+    project: projects.length, // プロジェクトの実際の数を使用
     someday: tasks.filter(t => t.status === 'someday').length,
     reference: tasks.filter(t => t.status === 'reference').length,
     completed: tasks.filter(t => t.status === 'completed').length,
@@ -30,6 +31,17 @@ const MobileNavbar: React.FC = () => {
       color: 'text-gray-600',
       activeColor: 'bg-gray-100 text-gray-800',
       count: counts.inbox,
+    },
+    {
+      to: '/search',
+      label: 'タスク検索',
+      icon: <Search className="w-5 h-5" />,
+      color: 'text-blue-600',
+      activeColor: 'bg-blue-100 text-blue-800',
+      count: 0,
+    },
+    {
+      type: 'divider'
     },
     {
       to: '/next',
@@ -125,12 +137,15 @@ const MobileNavbar: React.FC = () => {
             </div>
           </div>
           
-          <button
-            onClick={toggleMenu}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-          >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex items-center space-x-2">
+            <UserMenu />
+            <button
+              onClick={toggleMenu}
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            >
+              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
       </div>
       

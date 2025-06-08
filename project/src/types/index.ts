@@ -13,6 +13,9 @@ export interface Task {
   assignedTo?: string;
   projectId?: string;
   timeEstimate?: number; // in minutes
+  priority?: number; // 0-5 (0=none, 1=low, 2=medium, 3=high, 4=urgent, 5=critical)
+  energyLevel?: 'low' | 'medium' | 'high';
+  context?: string; // @home, @office, @computer, etc.
   isMultiStep?: boolean;
 }
 
@@ -25,6 +28,7 @@ export interface Project {
   created: Date;
   updated?: Date;
   completedDate?: Date;
+  archivedAt?: Date;
   progress: number; // 0-100
 }
 

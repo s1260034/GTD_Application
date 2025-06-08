@@ -1,7 +1,8 @@
 import React from 'react';
 import { Task } from '../../../types';
 import { useProcessContext } from '../../../contexts/ProcessContext';
-import { Layers, ArrowRight, HelpCircle } from 'lucide-react';
+import { useSubscription } from '../../../contexts/SubscriptionContext';
+import { Layers, ArrowRight, HelpCircle, Lock } from 'lucide-react';
 
 interface Step3Props {
   task: Task;
@@ -9,6 +10,13 @@ interface Step3Props {
 
 const Step3MultiStep: React.FC<Step3Props> = ({ task }) => {
   const { completeStep } = useProcessContext();
+  const { canCreateProject } = useSubscription();
+
+  const handleProjectCreation = () => {
+    if (canCreateProject) {
+      completeStep(3, 'yes');
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -23,17 +31,33 @@ const Step3MultiStep: React.FC<Step3Props> = ({ task }) => {
       
       <div className="grid grid-cols-1 gap-3 sm:gap-4">
         <button
-          onClick={() => completeStep(3, 'yes')}
-          className="bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg p-3 sm:p-4 text-left flex items-start transition-colors"
+          onClick={handleProjectCreation}
+          disabled={!canCreateProject}
+          className={`border rounded-lg p-3 sm:p-4 text-left flex items-start transition-colors ${
+            canCreateProject
+              ? 'bg-green-50 hover:bg-green-100 border-green-200'
+              : 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-60'
+          }`}
         >
-          <div className="bg-green-100 p-2 rounded-full mr-3 sm:mr-4 flex-shrink-0">
-            <Layers className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
+          <div className={`p-2 rounded-full mr-3 sm:mr-4 flex-shrink-0 ${
+            canCreateProject ? 'bg-green-100' : 'bg-gray-100'
+          }`}>
+            {canCreateProject ? (
+              <Layers className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
+            ) : (
+              <Lock className="w-4 h-4 sm:w-6 sm:h-6 text-gray-500" />
+            )}
           </div>
           <div className="min-w-0">
             <h3 className="font-medium text-gray-800 mb-1 text-sm sm:text-base">はい、プロジェクトです</h3>
             <p className="text-xs sm:text-sm text-gray-600">
               完了するために複数のステップや行動が必要です
             </p>
+            {!canCreateProject && (
+              <p className="text-xs text-red-600 mt-1">
+                今月のプロジェクト作成上限に達しました。Proプランにアップグレードしてください。
+              </p>
+            )}
           </div>
         </button>
         

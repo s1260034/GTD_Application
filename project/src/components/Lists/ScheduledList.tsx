@@ -18,13 +18,15 @@ const ScheduledList: React.FC = () => {
   
   const scheduledTasks = getTasksByStatus('scheduled');
   
-  // Group tasks by date
+  // Group tasks by date - use scheduledDate instead of dueDate
   const tasksByDate: Record<string, typeof scheduledTasks> = {};
   
   scheduledTasks.forEach(task => {
-    if (!task.dueDate) return;
+    // Use scheduledDate for scheduled tasks
+    const taskDate = task.scheduledDate || task.dueDate;
+    if (!taskDate) return;
     
-    const dateStr = task.dueDate.toISOString().split('T')[0];
+    const dateStr = taskDate.toISOString().split('T')[0];
     if (!tasksByDate[dateStr]) {
       tasksByDate[dateStr] = [];
     }
@@ -67,7 +69,7 @@ const ScheduledList: React.FC = () => {
       addTask({
         title: newTaskTitle.trim(),
         status: 'scheduled',
-        dueDate: selectedDate,
+        scheduledDate: selectedDate, // Use scheduledDate instead of dueDate
       });
       setNewTaskTitle('');
       setShowAddTask(false);

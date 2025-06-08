@@ -1,68 +1,10 @@
 import React, { useState } from 'react';
 import { useTaskContext } from '../../contexts/TaskContext';
+import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { Layers, Clock, Split, ChevronDown, MoveLeft, Trash2, CheckCircle, ArrowRight, User, Calendar, Archive, MoreVertical } from 'lucide-react';
+import { Layers, Clock, Split, ChevronDown, Trash2, CheckCircle, ArrowRight, User, Calendar, Archive, MoreVertical, AlertTriangle, Edit2, Check, X } from 'lucide-react';
 import { Project, Task, TaskStatus } from '../../types';
 import TaskItem from '../common/TaskItem';
-
-interface TaskStatusDropdownProps {
-  task: Task;
-  onStatusChange: (status: TaskStatus) => void;
-}
-
-const TaskStatusDropdown: React.FC<TaskStatusDropdownProps> = ({ task, onStatusChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const statusOptions: { value: TaskStatus; label: string; color: string; bgColor: string }[] = [
-    { value: 'next', label: '次のアクション', color: 'text-blue-700', bgColor: 'bg-blue-100' },
-    { value: 'waiting', label: '待ち項目', color: 'text-orange-700', bgColor: 'bg-orange-100' },
-    { value: 'scheduled', label: '予定済み', color: 'text-purple-700', bgColor: 'bg-purple-100' },
-    { value: 'someday', label: 'いつか/たぶん', color: 'text-teal-700', bgColor: 'bg-teal-100' },
-    { value: 'reference', label: '参考資料', color: 'text-indigo-700', bgColor: 'bg-indigo-100' },
-  ];
-
-  const getCurrentStatusInfo = () => {
-    const currentOption = statusOptions.find(option => option.value === task.status);
-    return currentOption || { label: '次のアクション', color: 'text-blue-700', bgColor: 'bg-blue-100' };
-  };
-
-  const currentStatus = getCurrentStatusInfo();
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${currentStatus.bgColor} ${currentStatus.color} hover:opacity-80 transition-opacity`}
-      >
-        {currentStatus.label}
-        <ChevronDown className="w-3 h-3 ml-1" />
-      </button>
-      
-      {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute left-0 mt-1 w-48 bg-white rounded-md shadow-lg z-20 py-1 border border-gray-200">
-            {statusOptions.map(option => (
-              <button
-                key={option.value}
-                onClick={() => {
-                  onStatusChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center ${option.color}`}
-              >
-                {option.label}に移動
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
 
 interface ProjectActionsDropdownProps {
   project: Project;
@@ -71,7 +13,7 @@ interface ProjectActionsDropdownProps {
 
 const ProjectActionsDropdown: React.FC<ProjectActionsDropdownProps> = ({ project, onBreakdown }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { moveProjectToInbox, completeProject, permanentlyDeleteProject } = useTaskContext();
+  const { moveProjectToInbox, completeProject, deleteProject } = useTaskContext();
 
   const handleMoveToInbox = () => {
     moveProjectToInbox(project.id);
@@ -84,10 +26,8 @@ const ProjectActionsDropdown: React.FC<ProjectActionsDropdownProps> = ({ project
   };
 
   const handleDelete = () => {
-    if (window.confirm('このプロジェクトと関連するすべてのタスクを削除しますか？')) {
-      permanentlyDeleteProject(project.id);
-      setIsOpen(false);
-    }
+    deleteProject(project.id);
+    setIsOpen(false);
   };
 
   const handleBreakdown = () => {
@@ -123,14 +63,6 @@ const ProjectActionsDropdown: React.FC<ProjectActionsDropdownProps> = ({ project
             <div className="border-t border-gray-200 my-1" />
             
             <button
-              onClick={handleMoveToInbox}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center text-gray-600"
-            >
-              <MoveLeft className="w-4 h-4 mr-2" />
-              インボックスに戻す
-            </button>
-            
-            <button
               onClick={handleComplete}
               className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center text-green-600"
             >
@@ -143,7 +75,7 @@ const ProjectActionsDropdown: React.FC<ProjectActionsDropdownProps> = ({ project
               className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center text-red-600"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              プロジェクト削除
+              ゴミ箱に移動
             </button>
           </div>
         </>
@@ -155,11 +87,14 @@ const ProjectActionsDropdown: React.FC<ProjectActionsDropdownProps> = ({ project
 interface BreakdownModalProps {
   project: Project;
   onClose: () => void;
+  onUpgrade: () => void;
 }
 
-const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose }) => {
+const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose, onUpgrade }) => {
   const [tasks, setTasks] = useState<string[]>(['']);
+  const [error, setError] = useState<string | null>(null);
   const { addTask } = useTaskContext();
+  const { canCreateTask } = useSubscription();
 
   const handleAddTask = () => {
     setTasks([...tasks, '']);
@@ -176,20 +111,29 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose }) => 
     setTasks(newTasks);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     const validTasks = tasks.filter(task => task.trim() !== '');
     
-    validTasks.forEach(taskTitle => {
-      addTask({
-        title: taskTitle,
-        status: 'next',
-        projectId: project.id,
-      });
-    });
+    if (!canCreateTask && validTasks.length > 0) {
+      setError('今月のタスク作成上限に達しました。');
+      return;
+    }
     
-    onClose();
+    try {
+      for (const taskTitle of validTasks) {
+        await addTask({
+          title: taskTitle,
+          status: 'next',
+          projectId: project.id,
+        });
+      }
+      onClose();
+    } catch (error: any) {
+      setError(error.message);
+    }
   };
 
   return (
@@ -200,6 +144,27 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose }) => 
             プロジェクトを分割: {project.title}
           </h2>
         </div>
+        
+        {error && (
+          <div className="p-4 border-b border-gray-200">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start text-red-700">
+              <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="text-sm">{error}</span>
+                {error.includes('上限') && (
+                  <div className="mt-2">
+                    <button
+                      onClick={onUpgrade}
+                      className="text-xs text-red-600 underline hover:text-red-700"
+                    >
+                      Proプランにアップグレード
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         
         <form onSubmit={handleSubmit}>
           <div className="p-4">
@@ -217,6 +182,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose }) => 
                     onChange={(e) => handleTaskChange(index, e.target.value)}
                     placeholder="タスクを入力"
                     className="flex-1 p-2 border border-gray-300 rounded-md"
+                    disabled={!canCreateTask}
                   />
                   <button
                     type="button"
@@ -234,7 +200,12 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose }) => 
             <button
               type="button"
               onClick={handleAddTask}
-              className="mt-4 text-blue-500 hover:bg-blue-50 px-4 py-2 rounded-md flex items-center"
+              disabled={!canCreateTask}
+              className={`mt-4 px-4 py-2 rounded-md flex items-center ${
+                canCreateTask 
+                  ? 'text-blue-500 hover:bg-blue-50' 
+                  : 'text-gray-400 cursor-not-allowed'
+              }`}
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
@@ -253,7 +224,12 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose }) => 
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+              disabled={!canCreateTask}
+              className={`px-4 py-2 rounded-md ${
+                canCreateTask
+                  ? 'bg-blue-500 text-white hover:bg-blue-600'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
               タスクを作成
             </button>
@@ -264,7 +240,11 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({ project, onClose }) => 
   );
 };
 
-const ProjectsList: React.FC = () => {
+interface ProjectsListProps {
+  onUpgrade: () => void;
+}
+
+const ProjectsList: React.FC<ProjectsListProps> = ({ onUpgrade }) => {
   const { projects, getProjectTasks } = useTaskContext();
   const { t } = useLanguage();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -312,6 +292,7 @@ const ProjectsList: React.FC = () => {
         <BreakdownModal
           project={selectedProject}
           onClose={() => setSelectedProject(null)}
+          onUpgrade={onUpgrade}
         />
       )}
     </div>
@@ -322,7 +303,7 @@ const ProjectCard: React.FC<{
   project: Project;
   onBreakdown: () => void;
 }> = ({ project, onBreakdown }) => {
-  const { getProjectTasks, updateTask } = useTaskContext();
+  const { getProjectTasks } = useTaskContext();
   const projectTasks = getProjectTasks(project.id);
   
   const relatedTasks = projectTasks.filter(task => 
@@ -339,129 +320,6 @@ const ProjectCard: React.FC<{
     : 0;
 
   const isProjectCompleted = project.completedDate !== undefined;
-
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    updateTask(taskId, { 
-      status: newStatus
-    });
-  };
-
-  const handleComplete = (taskId: string) => {
-    updateTask(taskId, { 
-      status: 'completed',
-      completedDate: new Date()
-    });
-  };
-
-  const handleReturnToInbox = (taskId: string) => {
-    updateTask(taskId, {
-      status: 'inbox',
-      projectId: undefined
-    });
-  };
-
-  const handleDelete = (taskId: string) => {
-    updateTask(taskId, {
-      status: 'deleted',
-      projectId: undefined
-    });
-  };
-
-  const renderTaskCard = (task: Task, isCompleted: boolean = false) => (
-    <div key={task.id} className={`p-3 rounded-lg border ${
-      isCompleted 
-        ? 'bg-green-50 border-green-200' 
-        : 'bg-gray-50 border-gray-200'
-    }`}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center mb-1">
-            <h5 className={`font-medium ${
-              isCompleted 
-                ? 'text-green-800 line-through' 
-                : 'text-gray-800'
-            }`}>
-              {task.title}
-            </h5>
-            {isCompleted && (
-              <CheckCircle className="w-4 h-4 ml-2 text-green-600" />
-            )}
-          </div>
-          
-          {task.description && (
-            <p className={`text-sm mb-2 line-clamp-2 ${
-              isCompleted 
-                ? 'text-green-600' 
-                : 'text-gray-600'
-            }`}>
-              {task.description}
-            </p>
-          )}
-          
-          <div className="flex items-center mt-2">
-            {!isCompleted && (
-              <TaskStatusDropdown
-                task={task}
-                onStatusChange={(status) => handleStatusChange(task.id, status)}
-              />
-            )}
-            
-            {isCompleted && (
-              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 flex items-center">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                完了済み
-              </span>
-            )}
-            
-            {task.timeEstimate && (
-              <span className="text-xs text-gray-500 ml-2 flex items-center">
-                <Clock className="w-3 h-3 mr-1" />
-                {task.timeEstimate}分
-              </span>
-            )}
-            
-            {isCompleted && task.completedDate && (
-              <span className="text-xs text-green-600 ml-2">
-                完了日: {task.completedDate.toLocaleDateString('ja-JP')}
-              </span>
-            )}
-          </div>
-        </div>
-        
-        <div className="flex space-x-1 ml-3">
-          {!isCompleted && task.status !== 'inbox' && task.status !== 'deleted' && (
-            <button 
-              onClick={() => handleReturnToInbox(task.id)}
-              className="p-1 rounded-full hover:bg-gray-100 text-gray-600"
-              title="インボックスに戻す"
-            >
-              <MoveLeft className="w-4 h-4" />
-            </button>
-          )}
-
-          {!isCompleted && task.status !== 'deleted' && (
-            <button 
-              onClick={() => handleComplete(task.id)}
-              className="p-1 rounded-full hover:bg-green-100 text-green-600"
-              title="完了としてマーク"
-            >
-              <CheckCircle className="w-4 h-4" />
-            </button>
-          )}
-          
-          {task.status !== 'deleted' && (
-            <button 
-              onClick={() => handleDelete(task.id)}
-              className="p-1 rounded-full hover:bg-red-100 text-red-600"
-              title="削除"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className={`bg-white rounded-lg shadow-sm border transition-shadow p-4 ${
@@ -532,7 +390,12 @@ const ProjectCard: React.FC<{
                 進行中のタスク ({activeTasks.length})
               </h4>
               <div className="space-y-2">
-                {activeTasks.map(task => renderTaskCard(task, false))}
+                {activeTasks.map(task => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -545,7 +408,13 @@ const ProjectCard: React.FC<{
                 完了済みタスク ({completedTasks.length})
               </h4>
               <div className="space-y-2">
-                {completedTasks.map(task => renderTaskCard(task, true))}
+                {completedTasks.map(task => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    showControls={false}
+                  />
+                ))}
               </div>
             </div>
           )}
