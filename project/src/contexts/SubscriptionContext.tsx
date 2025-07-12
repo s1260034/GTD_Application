@@ -117,6 +117,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const fetchSubscriptionData = async () => {
     if (!user) return
 
+    let finalUsageLimits: UsageLimits | null = null
+
     try {
       // Fetch subscription data using the view
       const { data: subData, error: subError } = await supabase
@@ -142,11 +144,11 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (usageError) {
         console.error('Error fetching usage limits:', usageError)
       } else if (usageData) {
-        setUsageLimits({
+        finalUsageLimits = {
           ...usageData,
           created_at: new Date(usageData.created_at),
           updated_at: new Date(usageData.updated_at),
-        })
+        }
       } else {
         // Create usage limits for current month if they don't exist
         // Initialize with current project count to handle existing projects
@@ -208,22 +210,22 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
                   })
                 }
               } else {
-                setUsageLimits({
+                finalUsageLimits = {
                   ...existingUsageData,
                   created_at: new Date(existingUsageData.created_at),
                   updated_at: new Date(existingUsageData.updated_at),
-                })
+                }
               }
             }
           } else {
             console.error('Error creating usage limits:', createError)
           }
         } else {
-          setUsageLimits({
+          finalUsageLimits = {
             ...newUsageData,
             created_at: new Date(newUsageData.created_at),
             updated_at: new Date(newUsageData.updated_at),
-          })
+          }
         }
       }
     } catch (error) {
@@ -231,6 +233,9 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     } finally {
       setLoading(false)
     }
+
+    // Always update state with the final usage limits data
+    setUsageLimits(finalUsageLimits)
   }
 
   const createCheckoutSession = async (priceId: string): Promise<string> => {
