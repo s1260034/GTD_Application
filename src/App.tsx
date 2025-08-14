@@ -6,6 +6,7 @@
 +import AdminPanel from './components/Admin/AdminPanel';
 
  function App() {
+ }
 @@ .. @@
                               <Route path="/reference" element={<ReferenceList />} />
                                <Route path="/completed" element={<CompletedList />} />
