@@ -23,6 +23,9 @@ interface TaskContextType {
   moveProjectToInbox: (projectId: string) => Promise<void>;
   completeProject: (projectId: string) => Promise<void>;
   permanentlyDeleteProject: (projectId: string) => Promise<void>;
+  permanentlyDeleteAllTasks: () => Promise<void>;
+  restoreAllTasks: () => Promise<void>;
+  restoreTask: (taskId: string) => Promise<void>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -466,6 +469,66 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setProjects(prev => prev.filter(project => project.id !== projectId));
   };
 
+  // 削除済みタスクを全て完全削除
+  const permanentlyDeleteAllTasks = async () => {
+    if (!user) throw new Error('User not authenticated');
+
+    const deletedTasks = getTasksByStatus('deleted');
+    if (deletedTasks.length === 0) return;
+
+    try {
+      // データベースから削除済みタスクを全て削除
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('status', 'deleted');
+
+      if (error) throw error;
+
+      // ローカル状態から削除済みタスクを除去
+      setTasks(prev => prev.filter(task => task.status !== 'deleted'));
+    } catch (error) {
+      console.error('Error permanently deleting all tasks:', error);
+      throw error;
+    }
+  };
+
+  // 削除済みタスクを全てインボックスに復元
+  const restoreAllTasks = async () => {
+    if (!user) throw new Error('User not authenticated');
+
+    const deletedTasks = getTasksByStatus('deleted');
+    if (deletedTasks.length === 0) return;
+
+    try {
+      // データベースで削除済みタスクを全てインボックスに移動
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'inbox' })
+        .eq('user_id', user.id)
+        .eq('status', 'deleted');
+
+      if (error) throw error;
+
+      // ローカル状態を更新
+      setTasks(prev => 
+        prev.map(task => 
+          task.status === 'deleted' 
+            ? { ...task, status: 'inbox' as TaskStatus, updated: new Date() }
+            : task
+        )
+      );
+    } catch (error) {
+      console.error('Error restoring all tasks:', error);
+      throw error;
+    }
+  };
+
+  // 個別タスクをインボックスに復元
+  const restoreTask = async (taskId: string) => {
+    await updateTask(taskId, { status: 'inbox' });
+  };
   return (
     <TaskContext.Provider value={{
       tasks,
@@ -484,6 +547,9 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       moveProjectToInbox,
       completeProject,
       permanentlyDeleteProject,
+      permanentlyDeleteAllTasks,
+      restoreAllTasks,
+      restoreTask,
     }}>
       {children}
     </TaskContext.Provider>

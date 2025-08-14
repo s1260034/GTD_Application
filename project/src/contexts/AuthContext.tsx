@@ -86,6 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { error }
   }
 
+
   return (
     <AuthContext.Provider
       value={{
